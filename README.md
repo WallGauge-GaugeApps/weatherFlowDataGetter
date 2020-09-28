@@ -1,2 +1,2 @@
 # weatherFlowDataGetter
-Data getter for the Sense WeatherFlow Smart Weather API
+Data getter for the Tempest Weather System from the WeatherFlow Smart Weather API

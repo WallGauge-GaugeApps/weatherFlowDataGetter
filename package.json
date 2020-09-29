@@ -1,0 +1,19 @@
+{
+  "name": "weatherflow-data-getter",
+  "version": "1.0.0",
+  "description": "gets weather data for the sense weather gauge from weatherflow.com",
+  "main": "weatherFlowDataGetter.js",
+  "scripts": {
+    "test": "testMe.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/WallGauge-GaugeApps/weatherFlowDataGetter.git"
+  },
+  "author": "John Rucker",
+  "license": "MIT",
+  "homepage": "https://WallGauge.com",
+  "dependencies": {
+    "node-fetch": "^2.6.1"
+  }
+}

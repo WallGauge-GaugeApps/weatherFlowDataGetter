@@ -22,7 +22,8 @@ const weatherDataObj = {
         precipChance: undefined
     },
     history: {
-        precipLast7Days: undefined
+        precipLast7Days: undefined,
+        precipMonth: undefined
     }
 };
 
@@ -35,7 +36,131 @@ class weatherFlowDataGetter {
         this.deviceID = deviceID;
         this.lat = '39.15366';
         this.lon = '-90.31903';
-        // this.stationID = '25682'
+    };
+
+    updateAllHistoryValues() {
+        return new Promise((resolve, reject) => {
+            this.getPrecipHistory(7)
+                .then((rslt) => {
+                    logit('Setting 7Day precip ' + rslt);
+                    this.data.history.precipLast7Days = rslt;
+                    return this.getMonthPrecipHistory()
+                })
+                .then((rslt) => {
+                    logit('Setting monthly precip ' + rslt);
+                    this.data.history.precipMonth = rslt;
+                    resolve(this.data.history);
+                })
+                .catch((err) => {
+                    logit('Error getting History information');
+                    reject(err);
+                });
+        });
+    };
+
+    getPrecipHistory(daysBack = 7) {
+        return new Promise((resolve, reject) => {
+            let dayOfMonth = (new Date()).getDate();
+            let promisesArray = []
+            for (let index = 1; index <= daysBack; index++) {
+                let dateCode = new Date((new Date()).setDate((new Date()).getDate() - index));
+                promisesArray.push(this.getHistory(dateCode))
+            }
+            Promise.all(promisesArray)
+                .then((values) => {
+                    let totalPrecip = 0;
+
+                    values.forEach((val) => {
+
+                        if (this.verbose) console.log('The rain amount for ' + (new Date(val.epoch)).toDateString() + ', lclDayRainAccumFinal = ' + convertMillimeterToInch(val.lclDayRainAccumFinal) + ', lclDayRainAccum = ' + convertMillimeterToInch(val.lclDayRainAccum));
+                        if (val.lclDayRainAccumFinal == null || val.lclDayRainAccumFinal == undefined) {
+                            totalPrecip = totalPrecip + val.lclDayRainAccum;
+                        } else {
+                            totalPrecip = totalPrecip + val.lclDayRainAccumFinal;
+                        }
+                    });
+                    totalPrecip = convertMillimeterToInch(totalPrecip);
+                    resolve(totalPrecip);
+                })
+                .catch((err) => {
+                    logit('Error with getPrecipHistory');
+                    reject(err);
+                })
+        })
+    };
+
+    getMonthPrecipHistory() {
+        return new Promise((resolve, reject) => {
+            let dayOfMonth = (new Date()).getDate();
+            let promisesArray = []
+            for (let index = 1; index < dayOfMonth; index++) {
+                let dateCode = new Date((new Date()).setDate((new Date()).getDate() - index));
+                promisesArray.push(this.getHistory(dateCode))
+            }
+            Promise.all(promisesArray)
+                .then((values) => {
+                    let totalPrecip = 0;
+
+                    values.forEach((val) => {
+
+                        if (this.verbose) console.log('The rain amount for ' + (new Date(val.epoch)).toDateString() + ', lclDayRainAccumFinal = ' + convertMillimeterToInch(val.lclDayRainAccumFinal) + ', lclDayRainAccum = ' + convertMillimeterToInch(val.lclDayRainAccum));
+                        if (val.lclDayRainAccumFinal == null || val.lclDayRainAccumFinal == undefined) {
+                            totalPrecip = totalPrecip + val.lclDayRainAccum;
+                        } else {
+                            totalPrecip = totalPrecip + val.lclDayRainAccumFinal;
+                        }
+                    });
+                    totalPrecip = convertMillimeterToInch(totalPrecip);
+                    resolve(totalPrecip);
+                })
+                .catch((err) => {
+                    logit('Error with getPrecipHistory');
+                    reject(err);
+                })
+        })
+    };
+
+    getHistory(dateCode = new Date()) {
+        return new Promise((resolve, reject) => {
+            let endTime = new Date(dateCode.setHours(23, 59));
+            let endEpoc = Math.round(endTime.getTime() / 1000);
+            let startEpoc = endEpoc - 60
+            if (this.verbose) {
+                logit('Getting weather history for ' + dateCode.toDateString() + ', endEpoc = ' + endEpoc + ', startEpoc = ' + startEpoc);
+            };
+            if (this.deviceID == '') {
+                reject('deviceID not Set')
+            } else {
+                let callObj = {
+                    method: 'GET',
+                    headers: {
+                        "Content-Type": "application/x-www-form-urlencoded"
+                    }
+                };
+                let uri = baseApiURL + '/observations/?device_id=' + this.deviceID + '&api_key=' + this.apiKey + '&time_start=' + startEpoc + '&time_end=' + endEpoc;
+
+                fetch(uri, callObj)
+                    .then(res => res.json())
+                    .then(jsonData => {
+                        if (this.verbose) {
+                            logit('getHistory Observation for ' + dateCode.toDateString());
+                            console.dir(jsonData, { depth: null });
+                        };
+                        if (jsonData.status.status_code != 0) {
+                            logit('API Error with getHistory:');
+                            reject(jsonData.status.status_message);
+                        } else {
+                            let pData = parseObservation(jsonData);
+
+                            resolve(pData);
+                        };
+                    })
+                    .catch(err => {
+                        console.error('Error calling ' + uri, err);
+                        reject(err);
+                    });
+            };
+        });
     };
 
     getCurrent() {
@@ -63,9 +188,7 @@ class weatherFlowDataGetter {
                             reject(jsonData.error);
                         } else {
                             let pData = parseObservation(jsonData);
-
-
-                            this.data.obsDate = new Date(pData.epoch)
+                            this.data.obsDate = (new Date(pData.epoch)).toLocaleString()
                             this.data.current.temp = convertCelsiusToFahrenheit(pData.airTemp);
                             this.data.current.feelsLike = convertCelsiusToFahrenheit(pData.summary.feelsLike);
                             this.data.current.wind = convertMetersPerSecondToMilesPerHour(pData.windAvg);
@@ -74,17 +197,6 @@ class weatherFlowDataGetter {
                             this.data.current.pressure = convertMillibarToInchOfMercury(pData.pressure);
                             this.data.current.precip = convertMillimeterToInch(pData.lclDayRainAccum);
                             this.data.current.humidity = pData.humidity;
-
-                            // this.data.forecast.maxTemp = jsonData.forecast.forecastday[0].day.maxtemp_f;
-                            // this.data.forecast.minTemp = jsonData.forecast.forecastday[0].day.mintemp_f;
-                            // this.data.forecast.maxWind = jsonData.forecast.forecastday[0].day.maxwind_mph;
-                            // this.data.forecast.totalPrecip = jsonData.forecast.forecastday[0].day.totalprecip_in;
-                            // this.data.forecast.rainChance = jsonData.forecast.forecastday[0].day.daily_chance_of_rain;
-                            // this.data.forecast.snowChance = jsonData.forecast.forecastday[0].day.daily_chance_of_snow;
-
-
-
-
                             resolve(pData);
                         };
                     })
@@ -222,7 +334,7 @@ function parseObservation(observation = {}) {
     try {
         let obs = observation.obs[0]
         if (Array.isArray(obs)) {
-            rtnObj.epoch = obs[0]
+            rtnObj.epoch = obs[0] * 1000
             rtnObj.windLull = obs[1]
             rtnObj.windAvg = obs[2]
             rtnObj.windGust = obs[3]

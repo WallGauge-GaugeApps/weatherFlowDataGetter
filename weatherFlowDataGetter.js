@@ -1,3 +1,4 @@
+const EventEmitter = require('events');
 const fetch = require('node-fetch');
 
 const logPrefix = 'weatherFlowDataGetter.js | ';
@@ -27,15 +28,32 @@ const weatherDataObj = {
     }
 };
 
-class weatherFlowDataGetter {
+const stationMeta = {
+    publicName: undefined,
+    latitude: undefined,
+    longitude: undefined,
+    stationID: undefined,
+    deviceID: undefined
+};
 
-    constructor(apiKey = '', deviceID = '', verboseLogging = false) {
+class weatherFlowDataGetter extends EventEmitter {
+
+    constructor(apiKey = '', verboseLogging = false) {
+        super();
         this.apiKey = apiKey;
         this.verbose = verboseLogging;
         this.data = weatherDataObj;
-        this.deviceID = deviceID;
-        this.lat = '39.15366';
-        this.lon = '-90.31903';
+        this.station = stationMeta;
+
+        this.getMetaData()
+            .then((stationInfo) => {
+                logit('Station meta data acquired for ' + this.station.publicName);
+                this.emit('ready');
+            })
+            .catch((err) => {
+                console.error('Error calling getMetaData!', err);
+                this.emit('errorStationMetaData', err)
+            });
     };
 
     updateAllHistoryValues() {
@@ -128,7 +146,7 @@ class weatherFlowDataGetter {
             if (this.verbose) {
                 logit('Getting weather history for ' + dateCode.toDateString() + ', endEpoc = ' + endEpoc + ', startEpoc = ' + startEpoc);
             };
-            if (this.deviceID == '') {
+            if (this.station.deviceID == '') {
                 reject('deviceID not Set')
             } else {
                 let callObj = {
@@ -137,7 +155,7 @@ class weatherFlowDataGetter {
                         "Content-Type": "application/x-www-form-urlencoded"
                     }
                 };
-                let uri = baseApiURL + '/observations/?device_id=' + this.deviceID + '&api_key=' + this.apiKey + '&time_start=' + startEpoc + '&time_end=' + endEpoc;
+                let uri = baseApiURL + '/observations/?device_id=' + this.station.deviceID + '&api_key=' + this.apiKey + '&time_start=' + startEpoc + '&time_end=' + endEpoc;
 
                 fetch(uri, callObj)
                     .then(res => res.json())
@@ -165,7 +183,7 @@ class weatherFlowDataGetter {
 
     getCurrent() {
         return new Promise((resolve, reject) => {
-            if (this.deviceID == '') {
+            if (this.station.deviceID == '') {
                 reject('deviceID not Set')
             } else {
                 let callObj = {
@@ -174,7 +192,7 @@ class weatherFlowDataGetter {
                         "Content-Type": "application/x-www-form-urlencoded"
                     }
                 };
-                let uri = baseApiURL + '/observations/?device_id=' + this.deviceID + '&api_key=' + this.apiKey;
+                let uri = baseApiURL + '/observations/?device_id=' + this.station.deviceID + '&api_key=' + this.apiKey;
 
                 fetch(uri, callObj)
                     .then(res => res.json())
@@ -209,9 +227,56 @@ class weatherFlowDataGetter {
         });
     };
 
+    getMetaData(stationID = '') {
+        return new Promise((resolve, reject) => {
+            if (this.apiKey == '') {
+                reject('apiKey not passed to getMetaData method')
+            } else {
+                let callObj = {
+                    method: 'GET',
+                    headers: {
+                        "Content-Type": "application/x-www-form-urlencoded"
+                    }
+                };
+                let uri = baseApiURL + '/stations/?api_key=' + this.apiKey;
+                fetch(uri, callObj)
+                    .then(res => res.json())
+                    .then(jsonData => {
+                        if (this.verbose) {
+                            logit('getMetaData follows:');
+                            console.dir(jsonData, { depth: null });
+                        };
+                        if (jsonData.status.status_code != 0) {
+                            logit('API Error with getHistory:');
+                            reject(jsonData.status.status_message);
+                        } else {
+                            this.station.publicName = jsonData.stations[0].public_name;
+                            this.station.latitude = jsonData.stations[0].latitude;
+                            this.station.longitude = jsonData.stations[0].longitude;
+                            this.station.stationID = jsonData.stations[0].station_id;
+
+                            let devices = jsonData.stations[0].devices;
+                            if (Array.isArray(devices)) {
+                                devices.forEach((device) => {
+                                    if (device.device_type == 'ST') {
+                                        this.station.deviceID = device.device_id;
+                                    };
+                                });;
+                            }
+                            resolve(this.station);
+                        };
+                    })
+                    .catch(err => {
+                        console.error('Error calling ' + uri, err);
+                        reject(err);
+                    });
+            };
+        });
+    };
+
     getForecast() {
         return new Promise((resolve, reject) => {
-            if (this.deviceID == '') {
+            if (this.station.deviceID == '') {
                 reject('deviceID not Set')
             } else {
                 let callObj = {
@@ -220,7 +285,7 @@ class weatherFlowDataGetter {
                         "Content-Type": "application/x-www-form-urlencoded"
                     }
                 };
-                let uri = baseApiURL + '/better_forecast?api_key=' + this.apiKey + '&lat=' + this.lat + '&lon=' + this.lon;
+                let uri = baseApiURL + '/better_forecast?api_key=' + this.apiKey + '&lat=' + this.station.latitude + '&lon=' + this.station.longitude;
 
                 fetch(uri, callObj)
                     .then(res => res.json())

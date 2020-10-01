@@ -47,96 +47,16 @@ class weatherFlowDataGetter extends EventEmitter {
 
         this.getMetaData()
             .then((stationInfo) => {
-                logit('Station meta data acquired for ' + this.station.publicName);
+                // logit('Station meta data acquired for ' + this.station.publicName);
                 this.emit('ready');
             })
             .catch((err) => {
-                console.error('Error calling getMetaData!', err);
+                logit('Error calling getMetaData during calss constuction!');
                 this.emit('errorStationMetaData', err)
             });
     };
 
-    updateAllHistoryValues() {
-        return new Promise((resolve, reject) => {
-            this.getPrecipHistory(7)
-                .then((rslt) => {
-                    logit('Setting 7Day precip ' + rslt);
-                    this.data.history.precipLast7Days = rslt;
-                    return this.getMonthPrecipHistory()
-                })
-                .then((rslt) => {
-                    logit('Setting monthly precip ' + rslt);
-                    this.data.history.precipMonth = rslt;
-                    resolve(this.data.history);
-                })
-                .catch((err) => {
-                    logit('Error getting History information');
-                    reject(err);
-                });
-        });
-    };
 
-    getPrecipHistory(daysBack = 7) {
-        return new Promise((resolve, reject) => {
-            let dayOfMonth = (new Date()).getDate();
-            let promisesArray = []
-            for (let index = 1; index <= daysBack; index++) {
-                let dateCode = new Date((new Date()).setDate((new Date()).getDate() - index));
-                promisesArray.push(this.getHistory(dateCode))
-            }
-            Promise.all(promisesArray)
-                .then((values) => {
-                    let totalPrecip = 0;
-
-                    values.forEach((val) => {
-
-                        if (this.verbose) console.log('The rain amount for ' + (new Date(val.epoch)).toDateString() + ', lclDayRainAccumFinal = ' + convertMillimeterToInch(val.lclDayRainAccumFinal) + ', lclDayRainAccum = ' + convertMillimeterToInch(val.lclDayRainAccum));
-                        if (val.lclDayRainAccumFinal == null || val.lclDayRainAccumFinal == undefined) {
-                            totalPrecip = totalPrecip + val.lclDayRainAccum;
-                        } else {
-                            totalPrecip = totalPrecip + val.lclDayRainAccumFinal;
-                        }
-                    });
-                    totalPrecip = convertMillimeterToInch(totalPrecip);
-                    resolve(totalPrecip);
-                })
-                .catch((err) => {
-                    logit('Error with getPrecipHistory');
-                    reject(err);
-                })
-        })
-    };
-
-    getMonthPrecipHistory() {
-        return new Promise((resolve, reject) => {
-            let dayOfMonth = (new Date()).getDate();
-            let promisesArray = []
-            for (let index = 1; index < dayOfMonth; index++) {
-                let dateCode = new Date((new Date()).setDate((new Date()).getDate() - index));
-                promisesArray.push(this.getHistory(dateCode))
-            }
-            Promise.all(promisesArray)
-                .then((values) => {
-                    let totalPrecip = 0;
-
-                    values.forEach((val) => {
-
-                        if (this.verbose) console.log('The rain amount for ' + (new Date(val.epoch)).toDateString() + ', lclDayRainAccumFinal = ' + convertMillimeterToInch(val.lclDayRainAccumFinal) + ', lclDayRainAccum = ' + convertMillimeterToInch(val.lclDayRainAccum));
-                        if (val.lclDayRainAccumFinal == null || val.lclDayRainAccumFinal == undefined) {
-                            totalPrecip = totalPrecip + val.lclDayRainAccum;
-                        } else {
-                            totalPrecip = totalPrecip + val.lclDayRainAccumFinal;
-                        }
-                    });
-                    totalPrecip = convertMillimeterToInch(totalPrecip);
-                    resolve(totalPrecip);
-                })
-                .catch((err) => {
-                    logit('Error with getPrecipHistory');
-                    reject(err);
-                })
-        })
-    };
 
     getHistory(dateCode = new Date()) {
         return new Promise((resolve, reject) => {
@@ -246,15 +166,11 @@ class weatherFlowDataGetter extends EventEmitter {
                             logit('getMetaData follows:');
                             console.dir(jsonData, { depth: null });
                         };
-                        if (jsonData.status.status_code != 0) {
-                            logit('API Error with getHistory:');
-                            reject(jsonData.status.status_message);
-                        } else {
+                        try {
                             this.station.publicName = jsonData.stations[0].public_name;
                             this.station.latitude = jsonData.stations[0].latitude;
                             this.station.longitude = jsonData.stations[0].longitude;
                             this.station.stationID = jsonData.stations[0].station_id;
-
                             let devices = jsonData.stations[0].devices;
                             if (Array.isArray(devices)) {
                                 devices.forEach((device) => {
@@ -264,6 +180,8 @@ class weatherFlowDataGetter extends EventEmitter {
                                 });;
                             }
                             resolve(this.station);
+                        } catch (err) {
+                            reject(err);
                         };
                     })
                     .catch(err => {
@@ -315,6 +233,89 @@ class weatherFlowDataGetter extends EventEmitter {
             };
         });
     };
+
+    updateAllHistoryValues() {
+        return new Promise((resolve, reject) => {
+            this.getAccumulatedPrecipHistory(7)
+                .then((rslt) => {
+                    logit('Setting 7Day precip ' + rslt);
+                    this.data.history.precipLast7Days = rslt;
+                    return this.getMonthPrecipHistory()
+                })
+                .then((rslt) => {
+                    logit('Setting monthly precip ' + rslt);
+                    this.data.history.precipMonth = rslt;
+                    resolve(this.data.history);
+                })
+                .catch((err) => {
+                    logit('Error getting History information');
+                    reject(err);
+                });
+        });
+    };
+
+    getAccumulatedPrecipHistory(daysBack = 7) {
+        return new Promise((resolve, reject) => {
+            let dayOfMonth = (new Date()).getDate();
+            let promisesArray = []
+            for (let index = 1; index <= daysBack; index++) {
+                let dateCode = new Date((new Date()).setDate((new Date()).getDate() - index));
+                promisesArray.push(this.getHistory(dateCode))
+            }
+            Promise.all(promisesArray)
+                .then((values) => {
+                    let totalPrecip = 0;
+
+                    values.forEach((val) => {
+
+                        if (this.verbose) console.log('The rain amount for ' + (new Date(val.epoch)).toDateString() + ', lclDayRainAccumFinal = ' + convertMillimeterToInch(val.lclDayRainAccumFinal) + ', lclDayRainAccum = ' + convertMillimeterToInch(val.lclDayRainAccum));
+                        if (val.lclDayRainAccumFinal == null || val.lclDayRainAccumFinal == undefined) {
+                            totalPrecip = totalPrecip + val.lclDayRainAccum;
+                        } else {
+                            totalPrecip = totalPrecip + val.lclDayRainAccumFinal;
+                        }
+                    });
+                    totalPrecip = convertMillimeterToInch(totalPrecip);
+                    resolve(totalPrecip);
+                })
+                .catch((err) => {
+                    logit('Error with getPrecipHistory');
+                    reject(err);
+                })
+        })
+    };
+
+    getMonthPrecipHistory() {
+        return new Promise((resolve, reject) => {
+            let dayOfMonth = (new Date()).getDate();
+            let promisesArray = []
+            for (let index = 1; index < dayOfMonth; index++) {
+                let dateCode = new Date((new Date()).setDate((new Date()).getDate() - index));
+                promisesArray.push(this.getHistory(dateCode))
+            }
+            Promise.all(promisesArray)
+                .then((values) => {
+                    let totalPrecip = 0;
+
+                    values.forEach((val) => {
+
+                        if (this.verbose) console.log('The rain amount for ' + (new Date(val.epoch)).toDateString() + ', lclDayRainAccumFinal = ' + convertMillimeterToInch(val.lclDayRainAccumFinal) + ', lclDayRainAccum = ' + convertMillimeterToInch(val.lclDayRainAccum));
+                        if (val.lclDayRainAccumFinal == null || val.lclDayRainAccumFinal == undefined) {
+                            totalPrecip = totalPrecip + val.lclDayRainAccum;
+                        } else {
+                            totalPrecip = totalPrecip + val.lclDayRainAccumFinal;
+                        }
+                    });
+                    totalPrecip = convertMillimeterToInch(totalPrecip);
+                    resolve(totalPrecip);
+                })
+                .catch((err) => {
+                    logit('Error with getPrecipHistory');
+                    reject(err);
+                })
+        })
+    };
+
 };
 
 function convertCelsiusToFahrenheit(celsiusValue) {

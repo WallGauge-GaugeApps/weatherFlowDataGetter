@@ -36,6 +36,5 @@ wApi.on('ready', () => {
 });
 
 wApi.on('errorStationMetaData', (err) => {
-    console.log('Error initializing weaterFlowDataGetter class.  Is your API Key correct?');
-    console.error('Error initializing weaterFlowDataGetter class', err);
+    console.error('Error initializing weaterFlowDataGetter class.  Is your API Key correct?', err);
 });

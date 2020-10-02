@@ -24,6 +24,7 @@ const weatherDataObj = {
     },
     history: {
         precipLast7Days: undefined,
+        precipLast30Days: undefined,
         precipMonth: undefined
     }
 };
@@ -240,6 +241,11 @@ class weatherFlowDataGetter extends EventEmitter {
                 .then((rslt) => {
                     logit('Setting 7Day precip ' + rslt);
                     this.data.history.precipLast7Days = rslt;
+                    return this.getAccumulatedPrecipHistory(30)
+                })
+                .then((rslt) => {
+                    logit('Setting 30Day precip ' + rslt);
+                    this.data.history.precipLast30Days = rslt;
                     return this.getMonthPrecipHistory()
                 })
                 .then((rslt) => {

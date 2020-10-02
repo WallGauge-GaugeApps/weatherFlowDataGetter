@@ -25,9 +25,10 @@ This class pulls weather information from the [WeatherFlow Smart Weather API](ht
 
 ## Notes
 
-Make sure you create a personal access token with the same credentials you used to install your tempest weather station.  The personal access token is used to find your station ID and location. If you use their generic access token this class will not know how to find your station ID and location.
+* For examples on how to call this class see [testMe.js](https://github.com/WallGauge-GaugeApps/weatherFlowDataGetter/blob/master/testMe.js)
+* Make sure you create a personal access token with the same credentials you used to install your tempest weather station.  The personal access token is used to find your station ID and location. If you use their generic access token this class will not know how to find your station ID and location.
 
-### This class will parse the weather data into the following data object
+## This class will parse the weather data into the following data object
 
 ```
 {

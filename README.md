@@ -2,7 +2,7 @@
 
 This class pulls weather information from the [WeatherFlow Smart Weather API](https://weatherflow.github.io/SmartWeather/api/#object-model) an api for accessing your Tempest weather station data.
 
-[<img src="https://cdn.shopify.com/s/files/1/0012/8512/8294/files/Tempest_Hub_Mount_shopify-amazon-whats-in-box-tabs.png?v=1588185214" alt="alt text" width="420px">](https://shop.weatherflow.com/collections/frontpage/products/tempest)
+[<img src="https://cdn.shopify.com/s/files/1/0012/8512/8294/files/Tempest_Hub_Mount_shopify-amazon-whats-in-box-tabs.png?v=1588185214" alt="alt text" width="640px">](https://shop.weatherflow.com/collections/frontpage/products/tempest)
 
 ## Software Requirements for this class
 
@@ -35,7 +35,7 @@ This class pulls weather information from the [WeatherFlow Smart Weather API](ht
   obsDate: '10/2/2020, 2:28:35 PM', // Observation time the data was entered into the weatherFlow cloud
   current: {                        // call getCurrent() to update
     temp: 56.8,                     // temp is the current temperature in Fahrenheit
-    feelsLike: 56.8,                // calculated by weaterFlow cloud
+    feelsLike: 56.8,                // calculated by weatherFlow cloud
     wind: 4,                        // wind speed in miles per hour
     windGust: 7.5,                  // wind gust in miles per hour
     windDegree: 266,                // wind direction in degrees
@@ -60,4 +60,4 @@ This class pulls weather information from the [WeatherFlow Smart Weather API](ht
 }
 ```
 
-Missing Data Note:  If history data is missing the updateAllHistoryValues() method will still return accumulated values of the data that is present. In other words if your new Tempest weather station has only been reporting data for 3 months the precipYear will only show a total for 3 months of precipitation.
+Missing Data Note:  If history data is missing the updateAllHistoryValues() method will still return accumulated values of the data that is present. In other words, if your new Tempest weather station has only been reporting data for 3 months the precipYear will only show a total for 3 months of precipitation.

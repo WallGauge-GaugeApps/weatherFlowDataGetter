@@ -3,6 +3,7 @@ const fetch = require('node-fetch');
 
 const logPrefix = 'weatherFlowDataGetter.js | ';
 const baseApiURL = 'https://swd.weatherflow.com/swd/rest';
+
 const weatherDataObj = {
     obsDate: undefined,
     current: {
@@ -24,8 +25,10 @@ const weatherDataObj = {
     },
     history: {
         precipLast7Days: undefined,
-        precipLast30Days: undefined,
-        precipMonth: undefined
+        precipLast14Days: undefined,
+        precipLast28Days: undefined,
+        precipMonth: undefined,
+        precipYear: undefined
     }
 };
 
@@ -39,6 +42,22 @@ const stationMeta = {
 
 class weatherFlowDataGetter extends EventEmitter {
 
+    /**
+     * Weather data for the Tempest weather station based on the WeatherFlow Smart Weather API.
+     * WeatherFlow API Documentation https://weatherflow.github.io/SmartWeather/api/.
+     * 
+     * This class emits:
+     *  this.emit('ready') When the station meta data is acquired and ready to make request.
+     *  this.emit('errorStationMetaData', err) If an error occurs in acquiring station meta data.
+     * 
+     * The target weather station ID and location (meta data) can be found in the "this.station" object. 
+     * The fields in the station object are populated based on the account the user logged into when generating the apiKey (Personal Use Token).
+     * 
+     * Weather data can be found in the "this.data" object, all values are in imperial units.
+     * 
+     * @param {string} apiKey api key (Personal Use Token) from https://tempestwx.com/settings/tokens
+     * @param {boolean} verboseLogging Defaults to false
+     */
     constructor(apiKey = '', verboseLogging = false) {
         super();
         this.apiKey = apiKey;
@@ -48,7 +67,10 @@ class weatherFlowDataGetter extends EventEmitter {
 
         this.getMetaData()
             .then((stationInfo) => {
-                // logit('Station meta data acquired for ' + this.station.publicName);
+                if (this.verbose) {
+                    logit('Station meta data acquired for ' + this.station.publicName + ', follows:');
+                    console.dir(stationInfo, { depth: null });
+                };
                 this.emit('ready');
             })
             .catch((err) => {
@@ -57,51 +79,13 @@ class weatherFlowDataGetter extends EventEmitter {
             });
     };
 
-
-
-    getHistory(dateCode = new Date()) {
-        return new Promise((resolve, reject) => {
-            let endTime = new Date(dateCode.setHours(23, 59));
-            let endEpoc = Math.round(endTime.getTime() / 1000);
-            let startEpoc = endEpoc - 60
-            if (this.verbose) {
-                logit('Getting weather history for ' + dateCode.toDateString() + ', endEpoc = ' + endEpoc + ', startEpoc = ' + startEpoc);
-            };
-            if (this.station.deviceID == '') {
-                reject('deviceID not Set')
-            } else {
-                let callObj = {
-                    method: 'GET',
-                    headers: {
-                        "Content-Type": "application/x-www-form-urlencoded"
-                    }
-                };
-                let uri = baseApiURL + '/observations/?device_id=' + this.station.deviceID + '&api_key=' + this.apiKey + '&time_start=' + startEpoc + '&time_end=' + endEpoc;
-
-                fetch(uri, callObj)
-                    .then(res => res.json())
-                    .then(jsonData => {
-                        if (this.verbose) {
-                            logit('getHistory Observation for ' + dateCode.toDateString());
-                            console.dir(jsonData, { depth: null });
-                        };
-                        if (jsonData.status.status_code != 0) {
-                            logit('API Error with getHistory:');
-                            reject(jsonData.status.status_message);
-                        } else {
-                            let pData = parseObservation(jsonData);
-
-                            resolve(pData);
-                        };
-                    })
-                    .catch(err => {
-                        console.error('Error calling ' + uri, err);
-                        reject(err);
-                    });
-            };
-        });
-    };
-
+    /**
+     * Gets current observation data for the this.station.deviceID from swd.weatherflow.com and populates this.data.current object.
+     * When the promise is resolved you can find the parsed weather data in the this.data.current object.
+     * The resolved promise argument will be a JSON object with native data (in metric units) from the /observations/device/{this.station.deviceID} api call as 
+     * documented here https://weatherflow.github.io/SmartWeather/api/swagger/#!/observations/getObservationsByDeviceId
+     * @returns {Promise} Resolved promise argument will be all data from the /observations/device/{this.station.deviceID} api call. 
+     */
     getCurrent() {
         return new Promise((resolve, reject) => {
             if (this.station.deviceID == '') {
@@ -148,7 +132,112 @@ class weatherFlowDataGetter extends EventEmitter {
         });
     };
 
-    getMetaData(stationID = '') {
+    /**
+     * Gets today's forecast based on Tempest weather station located at this.station.latitude, this.station.longitude and populates this.data.forecast object.
+     * When the promise is resolved, the forecast data in this.data.forecast will be correct.
+     * The resolved promise argument will be a very large JSON object with the native data from the /better_forecast api call.
+     * This api endpoint is still under development and has not been documented.
+     * @returns {Promise} Resolved promise argument will be all raw forecast data from the api call.
+     */
+    getForecast() {
+        return new Promise((resolve, reject) => {
+            if (this.station.deviceID == '') {
+                reject('deviceID not Set')
+            } else {
+                let callObj = {
+                    method: 'GET',
+                    headers: {
+                        "Content-Type": "application/x-www-form-urlencoded"
+                    }
+                };
+                let uri = baseApiURL + '/better_forecast?api_key=' + this.apiKey + '&lat=' + this.station.latitude + '&lon=' + this.station.longitude;
+
+                fetch(uri, callObj)
+                    .then(res => res.json())
+                    .then(jsonData => {
+                        if (this.verbose) {
+                            logit('Current Weather Forecast follows:');
+                            console.dir(jsonData.forecast.daily[0], { depth: null });
+                        };
+                        if (jsonData.error) {
+                            logit('API Error with getCurrent:');
+                            reject(jsonData.error);
+                        } else {
+                            let fHighs = findForecastHighs(jsonData);
+                            this.data.forecast.maxTemp = convertCelsiusToFahrenheit(jsonData.forecast.daily[0].air_temp_high);
+                            this.data.forecast.minTemp = convertCelsiusToFahrenheit(jsonData.forecast.daily[0].air_temp_low);
+                            this.data.forecast.maxWind = convertMetersPerSecondToMilesPerHour(fHighs.maxWind);
+                            this.data.forecast.totalPrecip = convertMillimeterToInch(fHighs.totalPrecip);
+                            this.data.forecast.precipChance = jsonData.forecast.daily[0].precip_probability;
+                            resolve(jsonData);
+                        };
+                    })
+                    .catch(err => {
+                        console.error('Error calling ' + uri, err);
+                        reject(err);
+                    });
+
+            };
+        });
+    };
+
+    /**
+     * Gets weather history for one day based on the dateCode parameter and the device ID set in this.station.deviceID. 
+     * The dateCode argument is the day in history to retrieve weather data. It is used to derive the time_start and time_end parameters of the /observations api endpoint 
+     * as documented here https://weatherflow.github.io/SmartWeather/api/swagger/#!/observations/getObservationsByDeviceId.
+     * @param {Date} dateCode a date object of the day in history to request weather data.
+     * @returns {Promise} Resolved promise argument will be parsed JSON object of call results. 
+     */
+    getHistory(dateCode = new Date()) {
+        return new Promise((resolve, reject) => {
+            let endTime = new Date(dateCode.setHours(23, 59));
+            let endEpoc = Math.round(endTime.getTime() / 1000);
+            let startEpoc = endEpoc - 60
+            if (this.verbose) {
+                logit('Getting weather history for ' + dateCode.toDateString() + ', endEpoc = ' + endEpoc + ', startEpoc = ' + startEpoc);
+            };
+            if (this.station.deviceID == '') {
+                reject('deviceID not Set')
+            } else {
+                let callObj = {
+                    method: 'GET',
+                    headers: {
+                        "Content-Type": "application/x-www-form-urlencoded"
+                    }
+                };
+                let uri = baseApiURL + '/observations/?device_id=' + this.station.deviceID + '&api_key=' + this.apiKey + '&time_start=' + startEpoc + '&time_end=' + endEpoc;
+                fetch(uri, callObj)
+                    .then(res => res.json())
+                    .then(jsonData => {
+                        if (this.verbose) {
+                            logit('getHistory Observation for ' + dateCode.toDateString());
+                            console.dir(jsonData, { depth: null });
+                        };
+                        if (jsonData.status.status_code != 0) {
+                            logit('API Error with getHistory:');
+                            reject(jsonData.status.status_message);
+                        } else {
+                            let pData = parseObservation(jsonData);
+                            if(this.verbose && pData.parseError != undefined) console.error('parse error in getHistory: ', pData.parseError)
+                            resolve(pData);
+                        };
+                    })
+                    .catch(err => {
+                        console.error('Error calling ' + uri, err);
+                        reject(err);
+                    });
+            };
+        });
+    };
+
+    /**
+     * Makes a call to the /stations api endpoint to read the meta data for the stationID associated with this.apiKey and populates this.station object based on results.
+     * A station is a collection of devices. This method will read through all the devices associated with the stationID and set
+     * this.station.deviceID based on the first device ID with device.device_type == 'ST'.
+     * Documentation for this endpoint https://weatherflow.github.io/SmartWeather/api/swagger/#!/stations/getStations.
+     * @returns {Promise} Resolved promise argument will be a JSON object of the results from call (all META data for the station).
+     */
+    getMetaData() {
         return new Promise((resolve, reject) => {
             if (this.apiKey == '') {
                 reject('apiKey not passed to getMetaData method')
@@ -193,63 +282,38 @@ class weatherFlowDataGetter extends EventEmitter {
         });
     };
 
-    getForecast() {
-        return new Promise((resolve, reject) => {
-            if (this.station.deviceID == '') {
-                reject('deviceID not Set')
-            } else {
-                let callObj = {
-                    method: 'GET',
-                    headers: {
-                        "Content-Type": "application/x-www-form-urlencoded"
-                    }
-                };
-                let uri = baseApiURL + '/better_forecast?api_key=' + this.apiKey + '&lat=' + this.station.latitude + '&lon=' + this.station.longitude;
-
-                fetch(uri, callObj)
-                    .then(res => res.json())
-                    .then(jsonData => {
-                        if (this.verbose) {
-                            logit('Current Weather Forecast follows:');
-                            console.dir(jsonData.forecast.daily[0], { depth: null });
-                        };
-                        if (jsonData.error) {
-                            logit('API Error with getCurrent:');
-                            reject(jsonData.error);
-                        } else {
-                            let fHighs = findForecastHighs(jsonData);
-                            this.data.forecast.maxTemp = convertCelsiusToFahrenheit(jsonData.forecast.daily[0].air_temp_high);
-                            this.data.forecast.minTemp = convertCelsiusToFahrenheit(jsonData.forecast.daily[0].air_temp_low);
-                            this.data.forecast.maxWind = convertMetersPerSecondToMilesPerHour(fHighs.maxWind);
-                            this.data.forecast.totalPrecip = convertMillimeterToInch(fHighs.totalPrecip);
-                            this.data.forecast.precipChance = jsonData.forecast.daily[0].precip_probability;
-                            resolve(jsonData.forecast.daily);
-                        };
-                    })
-                    .catch(err => {
-                        console.error('Error calling ' + uri, err);
-                        reject(err);
-                    });
-
-            };
-        });
-    };
-
+    /**
+     * Updates history values in this.data.history object by calling:
+     * getAccumulatedPrecipHistory(7), getAccumulatedPrecipHistory(14), getAccumulatedPrecipHistory(28), and getMonthPrecipHistory().
+     * Call this method once a day to keep history up to date.
+     * @returns {Promise} Resolved promise argument will be this.data.history 
+     */
     updateAllHistoryValues() {
         return new Promise((resolve, reject) => {
             this.getAccumulatedPrecipHistory(7)
                 .then((rslt) => {
-                    logit('Setting 7Day precip ' + rslt);
+                    if (this.verbose) logit('Setting 7 Day precip ' + rslt);
                     this.data.history.precipLast7Days = rslt;
-                    return this.getAccumulatedPrecipHistory(30)
+                    return this.getAccumulatedPrecipHistory(14)
                 })
                 .then((rslt) => {
-                    logit('Setting 30Day precip ' + rslt);
-                    this.data.history.precipLast30Days = rslt;
+                    if (this.verbose) logit('Setting 14 Day precip ' + rslt);
+                    this.data.history.precipLast14Days = rslt;
+                    return this.getAccumulatedPrecipHistory(28)
+                })
+                .then((rslt) => {
+                    if (this.verbose) logit('Setting 28 Day precip ' + rslt);
+                    this.data.history.precipLast28Days = rslt;
+                    return this.getAccumulatedPrecipHistory(getDaysIntoThisYear())
+                })
+                .then((rslt)=>{
+                    if (this.verbose) logit('Setting yearly precip ' + rslt);
+                    console.log('result from get years worth of rain = ' + rslt);
+                    this.data.history.precipYear = rslt;                    
                     return this.getMonthPrecipHistory()
                 })
                 .then((rslt) => {
-                    logit('Setting monthly precip ' + rslt);
+                    if (this.verbose) logit('Setting monthly precip ' + rslt);
                     this.data.history.precipMonth = rslt;
                     resolve(this.data.history);
                 })
@@ -260,6 +324,11 @@ class weatherFlowDataGetter extends EventEmitter {
         });
     };
 
+    /**
+     * Calls getHistory repeatedly for the value passed in daysBack parameter to calculate the accumulated precipitation.
+     * @param {number} daysBack Days in history to go back and fetch accumulated precipitation.
+     * @returns {Promise} Resolved promise argument will be accumulated precipitation (in inches) for daysBack from today, as a number.
+     */
     getAccumulatedPrecipHistory(daysBack = 7) {
         return new Promise((resolve, reject) => {
             let dayOfMonth = (new Date()).getDate();
@@ -291,6 +360,10 @@ class weatherFlowDataGetter extends EventEmitter {
         })
     };
 
+    /**
+     * Calls this.getHistory repeatedly for every day of the current month up to today to calculate the accumlated precipitation for this month.
+     * @returns {Promise} Resolved promise argument will be accumulated precipitation (in inches) for the current month, as a number.
+     */
     getMonthPrecipHistory() {
         return new Promise((resolve, reject) => {
             let dayOfMonth = (new Date()).getDate();
@@ -321,7 +394,6 @@ class weatherFlowDataGetter extends EventEmitter {
                 })
         })
     };
-
 };
 
 function convertCelsiusToFahrenheit(celsiusValue) {
@@ -368,6 +440,7 @@ function findForecastHighs(fcstObj = {}, dayToLookup = new Date()) {
 
 function parseObservation(observation = {}) {
     let rtnObj = {
+        parseError: undefined,
         epoch: undefined,
         windLull: undefined,
         windAvg: undefined,
@@ -387,8 +460,8 @@ function parseObservation(observation = {}) {
         battery: undefined,
         reptInterval: undefined,
         lclDayRainAccum: undefined,
-        rainAccumFinal: undefined,
-        lclDayRainAccumFinal: undefined,
+        rainAccumFinal: 0,
+        lclDayRainAccumFinal: 0,
         precipAnalysis: undefined,
         summary: {
             pressureTrend: undefined,
@@ -443,10 +516,18 @@ function parseObservation(observation = {}) {
             rtnObj.summary.windChill = observation.summary.wind_chill
         }
     } catch (err) {
-        console.error('Error weatherFlowDataGetter parseObservation', err);
+        // console.error('Error weatherFlowDataGetter parseObservation', err);
+        rtnObj.parseError = err;
     };
     return rtnObj;
 };
+
+function getDaysIntoThisYear() {
+    let now = new Date();
+    let start = new Date(now.getFullYear(), 0, 0);
+    let diff = (now - start) + ((start.getTimezoneOffset() - now.getTimezoneOffset()) * 60 * 1000);
+    return Math.floor(diff / (1000 * 60 * 60 * 24));
+}
 
 function logit(txt = '') {
     console.debug(logPrefix + txt);

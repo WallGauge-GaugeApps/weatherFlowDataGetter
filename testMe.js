@@ -4,7 +4,7 @@ const actObj = require('./actObj.json');
 const wApi = new WAPI(actObj.apiKey, false);
 
 wApi.on('ready', () => {
-    console.log('Weather Flow Data Getter clase construction complete.  Getting all precip history...')
+    console.log('Weather Flow Data Getter class construction complete.  Getting all precip history...')
     wApi.updateAllHistoryValues()
         .then((rslt) => {
             console.log('History call complete.  Getting current conditions...');

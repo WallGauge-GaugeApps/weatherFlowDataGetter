@@ -98,7 +98,6 @@ class weatherFlowDataGetter extends EventEmitter {
                     }
                 };
                 let uri = baseApiURL + '/observations/station/' + this.station.stationID + '?api_key=' + this.apiKey;
-
                 fetch(uri, callObj)
                     .then(res => res.json())
                     .then(jsonData => {
@@ -133,60 +132,6 @@ class weatherFlowDataGetter extends EventEmitter {
             };
         });
     };
-
-    // getCurrentFromDeviceID() {
-    //     return new Promise((resolve, reject) => {
-    //         if (this.station.deviceID == '') {
-    //             reject('deviceID not Set')
-    //         } else {
-    //             let callObj = {
-    //                 method: 'GET',
-    //                 headers: {
-    //                     "Content-Type": "application/x-www-form-urlencoded"
-    //                 }
-    //             };
-    //             let uri = baseApiURL + '/observations/?device_id=' + this.station.deviceID + '&api_key=' + this.apiKey;
-
-    //             fetch(uri, callObj)
-    //                 .then(res => res.json())
-    //                 .then(jsonData => {
-    //                     if (this.verbose) {
-    //                         logit('Current Weather Observation follows:');
-    //                         console.dir(jsonData, { depth: null });
-    //                     };
-    //                     if (jsonData.error) {
-    //                         logit('API Error with getCurrent:');
-    //                         reject(jsonData.error);
-    //                     } else {
-    //                         let pData = {}
-    //                         if (jsonData.type == 'obs_st') {
-    //                             pData = parseObservationSt(jsonData);
-    //                         } else if (jsonData.type == 'obs_sky') {
-    //                             pData = parseObservationSky(jsonData)
-    //                         } else {
-    //                             reject('Error data.type ->' + jsonData.type + '<- does not have a parse function.');
-    //                             return
-    //                         };
-    //                         if ('epoch' in pData) this.data.obsDate = (new Date(pData.epoch)).toLocaleString()
-    //                         if ('airTemp' in pData) this.data.current.temp = convertCelsiusToFahrenheit(pData.airTemp);
-    //                         if ('feelsLike' in pData.summary) this.data.current.feelsLike = convertCelsiusToFahrenheit(pData.summary.feelsLike);
-    //                         if ('windAvg' in pData) this.data.current.wind = convertMetersPerSecondToMilesPerHour(pData.windAvg);
-    //                         if ('windDirection' in pData) this.data.current.windDegree = pData.windDirection;
-    //                         if ('windGust' in pData) this.data.current.windGust = convertMetersPerSecondToMilesPerHour(pData.windGust);
-    //                         if ('pressure' in pData) this.data.current.pressure = convertMillibarToInchOfMercury(pData.pressure);
-    //                         if ('lclDayRainAccum' in pData) this.data.current.precip = convertMillimeterToInch(pData.lclDayRainAccum);
-    //                         if ('humidity' in pData) this.data.current.humidity = pData.humidity;
-    //                         resolve(pData);
-    //                     };
-    //                 })
-    //                 .catch(err => {
-    //                     console.error('Error calling ' + uri, err);
-    //                     reject(err);
-    //                 });
-
-    //         };
-    //     });
-    // };
 
     /**
      * Gets today's forecast based on Tempest weather station located at this.station.latitude, this.station.longitude and populates this.data.forecast object.

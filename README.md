@@ -27,7 +27,7 @@ This class pulls weather information from the [WeatherFlow Smart Weather API](ht
 
 * For examples on how to call this class see [testMe.js](https://github.com/WallGauge-GaugeApps/weatherFlowDataGetter/blob/master/testMe.js)
 * Make sure you create a personal access token with the same credentials you used to install your tempest weather station.  The personal access token is used to find your station ID and location.
-  * If you use a generic access token (development token) you will need to call `getMetaData('stationID')` with the stationID you would like to query. This will look for the station META data based on the stationID instead of relying on the personal access token to set the stationID. testMe.js has an example of how to make this call in the `errorStationMetaData` event consumer.
+  * If you use a generic access token (development token) you will need to call `getMetaData('stationID')` with the stationID you would like to query. This will look for the station META data based on the stationID instead of relying on the personal access token to set the stationID. testMe.js has an example of how to make this call in the [errorStationMetaData](https://github.com/WallGauge-GaugeApps/weatherFlowDataGetter/blob/ddad38b9be54a0aa5c79ed343afaddea779cefb4/testMe.js#L22) event consumer.
 
 ## This class will parse the weather data into the following data object
 

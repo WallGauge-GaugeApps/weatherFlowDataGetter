@@ -1,6 +1,6 @@
 # weatherFlowDataGetter (Tempest weather station data getter for WallGauge.com)
 
-This class pulls weather information from the [WeatherFlow Smart Weather API](https://weatherflow.github.io/SmartWeather/api/#object-model) an api for accessing your Tempest weather station data.
+This class pulls weather information from the [WeatherFlow Smart Weather API](https://weatherflow.github.io/SmartWeather/api/#object-model) an api for accessing your Tempest weather station data (Air and Sky weather stations also supported).
 
 [<img src="https://cdn.shopify.com/s/files/1/0012/8512/8294/files/Tempest_Hub_Mount_shopify-amazon-whats-in-box-tabs.png?v=1588185214" alt="alt text" width="640px">](https://shop.weatherflow.com/collections/frontpage/products/tempest)
 
@@ -26,7 +26,8 @@ This class pulls weather information from the [WeatherFlow Smart Weather API](ht
 ## Notes
 
 * For examples on how to call this class see [testMe.js](https://github.com/WallGauge-GaugeApps/weatherFlowDataGetter/blob/master/testMe.js)
-* Make sure you create a personal access token with the same credentials you used to install your tempest weather station.  The personal access token is used to find your station ID and location. If you use their generic access token this class will not know how to find your station ID and location.
+* Make sure you create a personal access token with the same credentials you used to install your tempest weather station.  The personal access token is used to find your station ID and location.
+  * If you use a generic access token (development token) you will need to call `getMetaData('stationID')` with the stationID you would like to query. This will look for the station META data based stationID insted of relying on the personal access token to set the stationID. testMe.js has an example of how to make this call in the `errorStationMetaData` event consumer.
 
 ## This class will parse the weather data into the following data object
 

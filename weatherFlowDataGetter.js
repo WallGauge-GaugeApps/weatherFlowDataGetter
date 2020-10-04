@@ -80,11 +80,11 @@ class weatherFlowDataGetter extends EventEmitter {
     };
 
     /**
-     * Gets current observation data for the this.station.deviceID from swd.weatherflow.com and populates this.data.current object.
+     * Gets current observation data for the this.station.stationID from swd.weatherflow.com and populates this.data.current object.
      * When the promise is resolved you can find the parsed weather data in the this.data.current object.
-     * The resolved promise argument will be a JSON object with native data (in metric units) from the /observations/device/{this.station.deviceID} api call as 
-     * documented here https://weatherflow.github.io/SmartWeather/api/swagger/#!/observations/getObservationsByDeviceId
-     * @returns {Promise} Resolved promise argument will be all data from the /observations/device/{this.station.deviceID} api call. 
+     * The resolved promise argument will be a JSON object with native data from the /observations/station/{this.station.stationID} api call as 
+     * documented here https://weatherflow.github.io/SmartWeather/api/swagger/#!/observations/getStationObservation
+     * @returns {Promise} Resolved promise argument will be all data from the /observations/station/{this.station.stationID} api call. 
      */
     getCurrent() {
         return new Promise((resolve, reject) => {
@@ -97,7 +97,7 @@ class weatherFlowDataGetter extends EventEmitter {
                         "Content-Type": "application/x-www-form-urlencoded"
                     }
                 };
-                let uri = baseApiURL + '/observations/?device_id=' + this.station.deviceID + '&api_key=' + this.apiKey;
+                let uri = baseApiURL + '/observations/station/' + this.station.stationID + '?api_key=' + this.apiKey;
 
                 fetch(uri, callObj)
                     .then(res => res.json())
@@ -106,21 +106,23 @@ class weatherFlowDataGetter extends EventEmitter {
                             logit('Current Weather Observation follows:');
                             console.dir(jsonData, { depth: null });
                         };
-                        if (jsonData.error) {
+                        if (jsonData.status.status_code != 0) {
                             logit('API Error with getCurrent:');
-                            reject(jsonData.error);
+                            reject(jsonData.station.status_message);
                         } else {
-                            let pData = parseObservation(jsonData);
-                            this.data.obsDate = (new Date(pData.epoch)).toLocaleString()
-                            this.data.current.temp = convertCelsiusToFahrenheit(pData.airTemp);
-                            this.data.current.feelsLike = convertCelsiusToFahrenheit(pData.summary.feelsLike);
-                            this.data.current.wind = convertMetersPerSecondToMilesPerHour(pData.windAvg);
-                            this.data.current.windDegree = pData.windDirection;
-                            this.data.current.windGust = convertMetersPerSecondToMilesPerHour(pData.windGust);
-                            this.data.current.pressure = convertMillibarToInchOfMercury(pData.pressure);
-                            this.data.current.precip = convertMillimeterToInch(pData.lclDayRainAccum);
-                            this.data.current.humidity = pData.humidity;
-                            resolve(pData);
+                            let pData = jsonData.obs[0]
+                            if(typeof(pData) == "object"){
+                                this.data.obsDate = (new Date(pData.timestamp * 1000)).toLocaleString();
+                                this.data.current.temp = convertCelsiusToFahrenheit(pData.air_temperature);
+                                this.data.current.feelsLike = convertCelsiusToFahrenheit(pData.feels_like);
+                                this.data.current.wind = convertMetersPerSecondToMilesPerHour(pData.wind_avg);
+                                this.data.current.windDegree = pData.wind_direction;
+                                this.data.current.windGust = convertMetersPerSecondToMilesPerHour(pData.wind_gust);
+                                this.data.current.pressure = convertMillibarToInchOfMercury(pData.sea_level_pressure);
+                                this.data.current.precip = convertMillimeterToInch(pData.precip_accum_local_day);
+                                this.data.current.humidity = pData.relative_humidity;
+                            }
+                            resolve(jsonData);
                         };
                     })
                     .catch(err => {
@@ -131,6 +133,60 @@ class weatherFlowDataGetter extends EventEmitter {
             };
         });
     };
+
+    // getCurrentFromDeviceID() {
+    //     return new Promise((resolve, reject) => {
+    //         if (this.station.deviceID == '') {
+    //             reject('deviceID not Set')
+    //         } else {
+    //             let callObj = {
+    //                 method: 'GET',
+    //                 headers: {
+    //                     "Content-Type": "application/x-www-form-urlencoded"
+    //                 }
+    //             };
+    //             let uri = baseApiURL + '/observations/?device_id=' + this.station.deviceID + '&api_key=' + this.apiKey;
+
+    //             fetch(uri, callObj)
+    //                 .then(res => res.json())
+    //                 .then(jsonData => {
+    //                     if (this.verbose) {
+    //                         logit('Current Weather Observation follows:');
+    //                         console.dir(jsonData, { depth: null });
+    //                     };
+    //                     if (jsonData.error) {
+    //                         logit('API Error with getCurrent:');
+    //                         reject(jsonData.error);
+    //                     } else {
+    //                         let pData = {}
+    //                         if (jsonData.type == 'obs_st') {
+    //                             pData = parseObservationSt(jsonData);
+    //                         } else if (jsonData.type == 'obs_sky') {
+    //                             pData = parseObservationSky(jsonData)
+    //                         } else {
+    //                             reject('Error data.type ->' + jsonData.type + '<- does not have a parse function.');
+    //                             return
+    //                         };
+    //                         if ('epoch' in pData) this.data.obsDate = (new Date(pData.epoch)).toLocaleString()
+    //                         if ('airTemp' in pData) this.data.current.temp = convertCelsiusToFahrenheit(pData.airTemp);
+    //                         if ('feelsLike' in pData.summary) this.data.current.feelsLike = convertCelsiusToFahrenheit(pData.summary.feelsLike);
+    //                         if ('windAvg' in pData) this.data.current.wind = convertMetersPerSecondToMilesPerHour(pData.windAvg);
+    //                         if ('windDirection' in pData) this.data.current.windDegree = pData.windDirection;
+    //                         if ('windGust' in pData) this.data.current.windGust = convertMetersPerSecondToMilesPerHour(pData.windGust);
+    //                         if ('pressure' in pData) this.data.current.pressure = convertMillibarToInchOfMercury(pData.pressure);
+    //                         if ('lclDayRainAccum' in pData) this.data.current.precip = convertMillimeterToInch(pData.lclDayRainAccum);
+    //                         if ('humidity' in pData) this.data.current.humidity = pData.humidity;
+    //                         resolve(pData);
+    //                     };
+    //                 })
+    //                 .catch(err => {
+    //                     console.error('Error calling ' + uri, err);
+    //                     reject(err);
+    //                 });
+
+    //         };
+    //     });
+    // };
 
     /**
      * Gets today's forecast based on Tempest weather station located at this.station.latitude, this.station.longitude and populates this.data.forecast object.
@@ -217,8 +273,19 @@ class weatherFlowDataGetter extends EventEmitter {
                             logit('API Error with getHistory:');
                             reject(jsonData.status.status_message);
                         } else {
-                            let pData = parseObservation(jsonData);
-                            if(this.verbose && pData.parseError != undefined) console.error('parse error in getHistory: ', pData.parseError)
+
+
+                            let pData = {}
+                            if (jsonData.type == 'obs_st') {
+                                pData = parseObservationSt(jsonData);
+                            } else if (jsonData.type == 'obs_sky') {
+                                pData = parseObservationSky(jsonData)
+                            } else {
+                                reject('Error data.type ->' + jsonData.type + '<- does not have a parse function.');
+                                return
+                            };
+
+                            if (this.verbose && pData.parseError != undefined) console.error('parse error in getHistory: ', pData.parseError)
                             resolve(pData);
                         };
                     })
@@ -235,9 +302,11 @@ class weatherFlowDataGetter extends EventEmitter {
      * A station is a collection of devices. This method will read through all the devices associated with the stationID and set
      * this.station.deviceID based on the first device ID with device.device_type == 'ST'.
      * Documentation for this endpoint https://weatherflow.github.io/SmartWeather/api/swagger/#!/stations/getStations.
+     * @param {string} stationID Optional station ID. Defaults to empty string (""). If not blank will get META data for station ID passed
      * @returns {Promise} Resolved promise argument will be a JSON object of the results from call (all META data for the station).
      */
-    getMetaData() {
+
+    getMetaData(stationID = '') {
         return new Promise((resolve, reject) => {
             if (this.apiKey == '') {
                 reject('apiKey not passed to getMetaData method')
@@ -248,7 +317,12 @@ class weatherFlowDataGetter extends EventEmitter {
                         "Content-Type": "application/x-www-form-urlencoded"
                     }
                 };
-                let uri = baseApiURL + '/stations/?api_key=' + this.apiKey;
+                let uri = ''
+                if (stationID == '') {
+                    uri = baseApiURL + '/stations/?api_key=' + this.apiKey;
+                } else {
+                    uri = baseApiURL + '/stations/' + stationID + '?api_key=' + this.apiKey;
+                }
                 fetch(uri, callObj)
                     .then(res => res.json())
                     .then(jsonData => {
@@ -264,7 +338,7 @@ class weatherFlowDataGetter extends EventEmitter {
                             let devices = jsonData.stations[0].devices;
                             if (Array.isArray(devices)) {
                                 devices.forEach((device) => {
-                                    if (device.device_type == 'ST') {
+                                    if (device.device_type == 'ST' || device.device_type == 'SK') {
                                         this.station.deviceID = device.device_id;
                                     };
                                 });;
@@ -306,10 +380,9 @@ class weatherFlowDataGetter extends EventEmitter {
                     this.data.history.precipLast28Days = rslt;
                     return this.getAccumulatedPrecipHistory(getDaysIntoThisYear())
                 })
-                .then((rslt)=>{
+                .then((rslt) => {
                     if (this.verbose) logit('Setting yearly precip ' + rslt);
-                    console.log('result from get years worth of rain = ' + rslt);
-                    this.data.history.precipYear = rslt;                    
+                    this.data.history.precipYear = rslt;
                     return this.getMonthPrecipHistory()
                 })
                 .then((rslt) => {
@@ -438,7 +511,68 @@ function findForecastHighs(fcstObj = {}, dayToLookup = new Date()) {
     return rtnObj;
 };
 
-function parseObservation(observation = {}) {
+function parseObservationSky(observation = {}) {
+    let rtnObj = {
+        parseError: undefined,
+        epoch: undefined,
+        Illuminance: undefined,
+        UV: undefined,
+        rainAccum: undefined,
+        windLull: undefined,
+        windAvg: undefined,
+        windGust: undefined,
+        windDirection: undefined,
+        battery: undefined,
+        reptInterval: undefined,
+        solarRadiation: undefined,
+        lclDayRainAccum: undefined,
+        precipType: undefined,
+        windInterval: undefined,
+        rainAccumFinal: 0,
+        lclDayRainAccumFinal: 0,
+        precipAnalysis: undefined,
+        summary: {
+            precipTotal1h: undefined,
+            precipAccumLocalYesterday: undefined,
+            precipAccumLocalYesterdayFinal: undefined,
+            precipAnalysisTypeYesterday: undefined
+        }
+    };
+    try {
+        let obs = observation.obs[0]
+        if (Array.isArray(obs)) {
+            rtnObj.epoch = obs[0] * 1000
+            rtnObj.Illuminance = obs[1]
+            rtnObj.UV = obs[2]
+            rtnObj.rainAccum = obs[3]
+            rtnObj.windLull = obs[4]
+            rtnObj.windAvg = obs[5]
+            rtnObj.windGust = obs[6]
+            rtnObj.windDirection = obs[7]
+            rtnObj.battery = obs[8]
+            rtnObj.reptInterval = obs[9]
+            rtnObj.solarRadiation = obs[10]
+            rtnObj.lclDayRainAccum = obs[11]
+            rtnObj.precipType = obs[12]
+            rtnObj.windInterval = obs[13]
+            rtnObj.rainAccumFinal = obs[14]
+            rtnObj.lclDayRainAccumFinal = obs[15]
+            rtnObj.precipAnalysis = obs[16]
+        };
+
+        if (observation.summary) {
+            rtnObj.summary.precipTotal1h = observation.summary.precip_total_1h
+            rtnObj.summary.precipAccumLocalYesterday = observation.summary.precip_accum_local_yesterday
+            rtnObj.summary.precipAccumLocalYesterdayFinal = observation.summary.precip_accum_local_yesterday_final
+            rtnObj.summary.precipAnalysisTypeYesterday = observation.summary.precip_analysis_type_yesterday
+        }
+    } catch (err) {
+        rtnObj.parseError = err;
+    }
+    return rtnObj
+}
+
+function parseObservationSt(observation = {}) {
     let rtnObj = {
         parseError: undefined,
         epoch: undefined,
@@ -516,7 +650,6 @@ function parseObservation(observation = {}) {
             rtnObj.summary.windChill = observation.summary.wind_chill
         }
     } catch (err) {
-        // console.error('Error weatherFlowDataGetter parseObservation', err);
         rtnObj.parseError = err;
     };
     return rtnObj;

@@ -1,6 +1,6 @@
 # weatherFlowDataGetter (Tempest weather station data getter for WallGauge.com)
 
-This class pulls weather information from the [WeatherFlow Smart Weather API](https://weatherflow.github.io/SmartWeather/api/#object-model), an API for accessing your Tempest weather station data (Air and Sky weather stations also supported).
+This class pulls weather information from the [WeatherFlow Smart Weather API](https://weatherflow.github.io/SmartWeather/api/#object-model), an API for accessing your [Tempest weather station](https://shop.weatherflow.com/collections/frontpage/products/tempest) data ([Air and Sky weather stations](https://weatherflow.com/smart-home-weather-stations/) also supported).
 
 [<img src="https://cdn.shopify.com/s/files/1/0012/8512/8294/files/Tempest_Hub_Mount_shopify-amazon-whats-in-box-tabs.png?v=1588185214" alt="alt text" width="640px">](https://shop.weatherflow.com/collections/frontpage/products/tempest)
 

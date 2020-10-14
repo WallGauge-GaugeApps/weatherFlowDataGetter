@@ -1,6 +1,6 @@
 {
   "name": "weatherflow-data-getter",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "gets weather data for the sense weather gauge from weatherflow.com",
   "main": "weatherFlowDataGetter.js",
   "scripts": {

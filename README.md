@@ -28,6 +28,7 @@ This class pulls weather information from the [WeatherFlow Smart Weather API](ht
 * For examples on how to call this class see [testMe.js](https://github.com/WallGauge-GaugeApps/weatherFlowDataGetter/blob/master/testMe.js)
 * Make sure you create a personal access token with the same credentials you used to install your tempest weather station.  The personal access token is used to find your station ID and location.
   * If you use a generic access token (development token) you will need to call [getMetaData('stationID')](https://github.com/WallGauge-GaugeApps/weatherFlowDataGetter/blob/bc1e1d0b16a23586f3334073d3595a1b57675b81/weatherFlowDataGetter.js#L245) with the stationID you would like to query. This will look for the station META data based on the stationID instead of relying on the personal access token to set the stationID. testMe.js has an example of how to make this call in the [errorStationMetaData](https://github.com/WallGauge-GaugeApps/weatherFlowDataGetter/blob/ddad38b9be54a0aa5c79ed343afaddea779cefb4/testMe.js#L22) event consumer.
+* Map of lightning stikes in real time for [North America](https://www.blitzortung.org/en/live_lightning_maps.php?map=30)
 
 ## This class will parse the weather data into the following data object
 
@@ -57,6 +58,11 @@ This class pulls weather information from the [WeatherFlow Smart Weather API](ht
     precipLast28Days: 2.55,         // Total accumulated precipitation for the last 28 days in inches.
     precipMonth: 0,                 // Total accumulated precipitation for the current month.
     precipYear: 6.99                // Total accumulated precipitation for the current year.
+  },
+    lightning: {
+    lastStikeDate: '9/12/2020, 12:28:39 AM',    // Time and Date of last lightning strike.
+    lastStrikeDistance: 10.56,                  // Distance of last lightning strike in Miles.
+    stikeCountLastHour: 0                       // Strike Count over the last hour.
   }
 }
 ```

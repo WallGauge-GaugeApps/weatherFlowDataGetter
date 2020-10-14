@@ -29,6 +29,11 @@ const weatherDataObj = {
         precipLast28Days: undefined,
         precipMonth: undefined,
         precipYear: undefined
+    },
+    lightning:{
+        lastStikeDate: undefined,
+        lastStrikeDistance: undefined,
+        stikeCountLastHour: undefined
     }
 };
 
@@ -110,7 +115,7 @@ class weatherFlowDataGetter extends EventEmitter {
                             reject(jsonData.station.status_message);
                         } else {
                             let pData = jsonData.obs[0]
-                            if(typeof(pData) == "object"){
+                            if (typeof (pData) == "object") {
                                 this.data.obsDate = (new Date(pData.timestamp * 1000)).toLocaleString();
                                 this.data.current.temp = convertCelsiusToFahrenheit(pData.air_temperature);
                                 this.data.current.feelsLike = convertCelsiusToFahrenheit(pData.feels_like);
@@ -120,6 +125,9 @@ class weatherFlowDataGetter extends EventEmitter {
                                 this.data.current.pressure = convertMillibarToInchOfMercury(pData.sea_level_pressure);
                                 this.data.current.precip = convertMillimeterToInch(pData.precip_accum_local_day);
                                 this.data.current.humidity = pData.relative_humidity;
+                                this.data.lightning.lastStikeDate = (new Date(pData.lightning_strike_last_epoch * 1000)).toLocaleString();
+                                this.data.lightning.lastStrikeDistance = converKilometersToMiles(pData.lightning_strike_last_distance);
+                                this.data.lightning.stikeCountLastHour = pData.lightning_strike_count_last_1hr;
                             }
                             resolve(jsonData);
                         };
@@ -218,18 +226,94 @@ class weatherFlowDataGetter extends EventEmitter {
                             logit('API Error with getHistory:');
                             reject(jsonData.status.status_message);
                         } else {
-
-
                             let pData = {}
-                            if (jsonData.type == 'obs_st') {
-                                pData = parseObservationSt(jsonData);
-                            } else if (jsonData.type == 'obs_sky') {
-                                pData = parseObservationSky(jsonData)
-                            } else {
-                                reject('Error data.type ->' + jsonData.type + '<- does not have a parse function.');
-                                return
-                            };
+                            let observations = [];
+                            if ('obs' in jsonData) {
+                                observations = jsonData.obs;
+                                if (Array.isArray(observations)) {
+                                    if (observations.length > 0) {
+                                        if (jsonData.type == 'obs_st') {
+                                            pData = parseObservationSt(observations[0]);
+                                        } else if (jsonData.type == 'obs_sky') {
+                                            pData = parseObservationSky(observations[0])
+                                        } else {
+                                            reject('Error data.type ->' + jsonData.type + '<- does not have a parse function.');
+                                            return
+                                        };
+                                    }
+                                }
+                            }
+                            if (this.verbose && pData.parseError != undefined) console.error('parse error in getHistory: ', pData.parseError)
+                            resolve(pData);
+                        };
+                    })
+                    .catch(err => {
+                        console.error('Error calling ' + uri, err);
+                        reject(err);
+                    });
+            };
+        });
+    };
 
+    /**
+     * Gets weather history for a time range based on the startEpoc and endEpoc parameters and the device ID set in this.station.deviceID. 
+     * as documented here https://weatherflow.github.io/SmartWeather/api/swagger/#!/observations/getObservationsByDeviceId.
+     * @param {*} startEpoc Query start time in seconds based on dateObj.getTime()/1000 
+     * @param {*} endEpoc Query end time in seconds based on dateObj.getTime()/1000 
+     * @returns {Promise} Resolved promise argument will be parsed JSON object of call results.
+     */
+    getHistoryRange(startEpoc = 0, endEpoc = 0) {
+        return new Promise((resolve, reject) => {
+            if (this.verbose) {
+                logit('Getting weather history for endEpoc = ' + endEpoc + ', startEpoc = ' + startEpoc);
+            };
+            if (this.station.deviceID == '') {
+                reject('deviceID not Set')
+            } else {
+                let callObj = {
+                    method: 'GET',
+                    headers: {
+                        "Content-Type": "application/x-www-form-urlencoded"
+                    }
+                };
+                let uri = baseApiURL + '/observations/?device_id=' + this.station.deviceID + '&api_key=' + this.apiKey + '&time_start=' + startEpoc + '&time_end=' + endEpoc;
+                fetch(uri, callObj)
+                    .then(res => res.json())
+                    .then(jsonData => {
+                        if (this.verbose) {
+                            logit('getHistory Observation follows:');
+                            console.dir(jsonData, { depth: null });
+                        };
+                        if (jsonData.status.status_code != 0) {
+                            logit('API Error with getHistory:');
+                            reject(jsonData.status.status_message);
+                        } else {
+                            let pData = []
+                            let observations = [];
+                            if ('obs' in jsonData) {
+                                observations = jsonData.obs;
+                                if (Array.isArray(observations)) {
+                                    if (observations.length > 0) {
+                                        if (jsonData.type == 'obs_st') {
+                                            // pData = parseObservationSt(observations[0]);
+
+                                            observations.forEach((val) => {
+                                                pData.push(parseObservationSt(val))
+                                            })
+
+
+
+
+
+                                        } else if (jsonData.type == 'obs_sky') {
+                                            pData = parseObservationSky(observations[0])
+                                        } else {
+                                            reject('Error data.type ->' + jsonData.type + '<- does not have a parse function.');
+                                            return
+                                        };
+                                    }
+                                }
+                            }
                             if (this.verbose && pData.parseError != undefined) console.error('parse error in getHistory: ', pData.parseError)
                             resolve(pData);
                         };
@@ -250,7 +334,6 @@ class weatherFlowDataGetter extends EventEmitter {
      * @param {string} stationID Optional station ID. Defaults to empty string (""). If not blank will get META data for station ID passed
      * @returns {Promise} Resolved promise argument will be a JSON object of the results from call (all META data for the station).
      */
-
     getMetaData(stationID = '') {
         return new Promise((resolve, reject) => {
             if (this.apiKey == '') {
@@ -358,15 +441,15 @@ class weatherFlowDataGetter extends EventEmitter {
             Promise.all(promisesArray)
                 .then((values) => {
                     let totalPrecip = 0;
-
                     values.forEach((val) => {
-
-                        if (this.verbose) console.log('The rain amount for ' + (new Date(val.epoch)).toDateString() + ', lclDayRainAccumFinal = ' + convertMillimeterToInch(val.lclDayRainAccumFinal) + ', lclDayRainAccum = ' + convertMillimeterToInch(val.lclDayRainAccum));
-                        if (val.lclDayRainAccumFinal == null || val.lclDayRainAccumFinal == undefined) {
-                            totalPrecip = totalPrecip + val.lclDayRainAccum;
-                        } else {
-                            totalPrecip = totalPrecip + val.lclDayRainAccumFinal;
-                        }
+                        if ('lclDayRainAccumFinal' in val || 'lclDayRainAccum' in val) {
+                            if (this.verbose) console.log('The rain amount for ' + (new Date(val.epoch)).toDateString() + ', lclDayRainAccumFinal = ' + convertMillimeterToInch(val.lclDayRainAccumFinal) + ', lclDayRainAccum = ' + convertMillimeterToInch(val.lclDayRainAccum));
+                            if (val.lclDayRainAccumFinal == null || val.lclDayRainAccumFinal == undefined) {
+                                totalPrecip = totalPrecip + val.lclDayRainAccum;
+                            } else {
+                                totalPrecip = totalPrecip + val.lclDayRainAccumFinal;
+                            };
+                        };
                     });
                     totalPrecip = convertMillimeterToInch(totalPrecip);
                     resolve(totalPrecip);
@@ -430,6 +513,10 @@ function convertMillimeterToInch(mmValue) {
     return Number(Number(mmValue / 25.4).toFixed(2));
 }
 
+function converKilometersToMiles(kValue){
+    return Number(Number(kValue / 1.609344497892563).toFixed(2));
+}
+
 function findForecastHighs(fcstObj = {}, dayToLookup = new Date()) {
     let rtnObj = {
         maxWind: undefined,
@@ -456,7 +543,7 @@ function findForecastHighs(fcstObj = {}, dayToLookup = new Date()) {
     return rtnObj;
 };
 
-function parseObservationSky(observation = {}) {
+function parseObservationSky(obs = []) {
     let rtnObj = {
         parseError: undefined,
         epoch: undefined,
@@ -484,7 +571,7 @@ function parseObservationSky(observation = {}) {
         }
     };
     try {
-        let obs = observation.obs[0]
+        // let obs = observation.obs[0]
         if (Array.isArray(obs)) {
             rtnObj.epoch = obs[0] * 1000
             rtnObj.Illuminance = obs[1]
@@ -505,11 +592,11 @@ function parseObservationSky(observation = {}) {
             rtnObj.precipAnalysis = obs[16]
         };
 
-        if (observation.summary) {
-            rtnObj.summary.precipTotal1h = observation.summary.precip_total_1h
-            rtnObj.summary.precipAccumLocalYesterday = observation.summary.precip_accum_local_yesterday
-            rtnObj.summary.precipAccumLocalYesterdayFinal = observation.summary.precip_accum_local_yesterday_final
-            rtnObj.summary.precipAnalysisTypeYesterday = observation.summary.precip_analysis_type_yesterday
+        if ('summary' in obs) {
+            rtnObj.summary.precipTotal1h = obs.summary.precip_total_1h
+            rtnObj.summary.precipAccumLocalYesterday = obs.summary.precip_accum_local_yesterday
+            rtnObj.summary.precipAccumLocalYesterdayFinal = obs.summary.precip_accum_local_yesterday_final
+            rtnObj.summary.precipAnalysisTypeYesterday = obs.summary.precip_analysis_type_yesterday
         }
     } catch (err) {
         rtnObj.parseError = err;
@@ -517,7 +604,7 @@ function parseObservationSky(observation = {}) {
     return rtnObj
 }
 
-function parseObservationSt(observation = {}) {
+function parseObservationSt(obs = []) {
     let rtnObj = {
         parseError: undefined,
         epoch: undefined,
@@ -556,7 +643,7 @@ function parseObservationSt(observation = {}) {
         }
     };
     try {
-        let obs = observation.obs[0]
+        // let obs = observation.obs[0]
         if (Array.isArray(obs)) {
             rtnObj.epoch = obs[0] * 1000
             rtnObj.windLull = obs[1]
@@ -582,17 +669,17 @@ function parseObservationSt(observation = {}) {
             rtnObj.precipAnalysis = obs[21]
         };
 
-        if (observation.summary) {
-            rtnObj.summary.pressureTrend = observation.summary.pressure_trend
-            rtnObj.summary.strikeCount1h = observation.summary.strike_count_1h
-            rtnObj.summary.strikeCount3h = observation.summary.strike_count_3h
-            rtnObj.summary.precipTotal1h = observation.summary.precip_total_1h
-            rtnObj.summary.strikeLastDist = observation.summary.strike_last_dist
-            rtnObj.summary.strikeLastEpoch = observation.summary.strike_last_epoch
-            rtnObj.summary.precipAccumLocalYesterday = observation.summary.precip_accum_local_yesterday
-            rtnObj.summary.feelsLike = observation.summary.feels_like
-            rtnObj.summary.heatIndex = observation.summary.heat_index
-            rtnObj.summary.windChill = observation.summary.wind_chill
+        if ('summary' in obs) {
+            rtnObj.summary.pressureTrend = obs.summary.pressure_trend
+            rtnObj.summary.strikeCount1h = obs.summary.strike_count_1h
+            rtnObj.summary.strikeCount3h = obs.summary.strike_count_3h
+            rtnObj.summary.precipTotal1h = obs.summary.precip_total_1h
+            rtnObj.summary.strikeLastDist = obs.summary.strike_last_dist
+            rtnObj.summary.strikeLastEpoch = obs.summary.strike_last_epoch
+            rtnObj.summary.precipAccumLocalYesterday = obs.summary.precip_accum_local_yesterday
+            rtnObj.summary.feelsLike = obs.summary.feels_like
+            rtnObj.summary.heatIndex = obs.summary.heat_index
+            rtnObj.summary.windChill = obs.summary.wind_chill
         }
     } catch (err) {
         rtnObj.parseError = err;

@@ -7,7 +7,6 @@ wApi.on('ready', () => {
     console.log("Here is the station's meta data:");
     console.dir(wApi.station, { depth: null });
     getAllWxData();
-
     setInterval(() => {
         wApi.getCurrent()
             .then((rslt) => {
@@ -32,13 +31,14 @@ wApi.on('errorStationMetaData', (err) => {
         });
 });
 
-
 function getAllWxData() {
     console.log('Getting current conditons for ' + wApi.station.publicName)
     wApi.getCurrent()
         .then((rslt) => {
             console.log('Get current complete. Observation Date = ' + wApi.data.obsDate);
             console.dir(wApi.data.current, { depth: null });
+            console.log('Here is the lightning information:')
+            console.dir(wApi.data.lightning, { depth: null });
             console.log('Getting Forecast...')
             return wApi.getForecast()
         })

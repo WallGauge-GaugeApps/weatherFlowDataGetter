@@ -30,7 +30,7 @@ const weatherDataObj = {
         precipMonth: undefined,
         precipYear: undefined
     },
-    lightning:{
+    lightning: {
         lastStikeDate: undefined,
         lastStrikeDistance: undefined,
         stikeCountLastHour: undefined
@@ -70,18 +70,22 @@ class weatherFlowDataGetter extends EventEmitter {
         this.data = weatherDataObj;
         this.station = stationMeta;
 
-        this.getMetaData()
-            .then((stationInfo) => {
-                if (this.verbose) {
-                    logit('Station meta data acquired for ' + this.station.publicName + ', follows:');
-                    console.dir(stationInfo, { depth: null });
-                };
-                this.emit('ready');
-            })
-            .catch((err) => {
-                logit('Error calling getMetaData during calss constuction!');
-                this.emit('errorStationMetaData', err)
-            });
+        if (this.apiKey != '' && this.apiKey != null) {
+            this.getMetaData()
+                .then((stationInfo) => {
+                    if (this.verbose) {
+                        logit('Station meta data acquired for ' + this.station.publicName + ', follows:');
+                        console.dir(stationInfo, { depth: null });
+                    };
+                    this.emit('ready');
+                })
+                .catch((err) => {
+                    logit('Error calling getMetaData during calss constuction!');
+                    this.emit('errorStationMetaData', err)
+                });
+        } else {
+            logit('Class constructor called without apiKey!');
+        };
     };
 
     /**
@@ -513,7 +517,7 @@ function convertMillimeterToInch(mmValue) {
     return Number(Number(mmValue / 25.4).toFixed(2));
 }
 
-function converKilometersToMiles(kValue){
+function converKilometersToMiles(kValue) {
     return Number(Number(kValue / 1.609344497892563).toFixed(2));
 }
 

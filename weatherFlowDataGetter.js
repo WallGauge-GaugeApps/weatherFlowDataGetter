@@ -362,6 +362,10 @@ class weatherFlowDataGetter extends EventEmitter {
                             logit('getMetaData follows:');
                             console.dir(jsonData, { depth: null });
                         };
+
+                        logit('getMetaData follows:');
+                        console.dir(jsonData, { depth: null });
+
                         try {
                             this.station.publicName = jsonData.stations[0].public_name;
                             this.station.latitude = jsonData.stations[0].latitude;

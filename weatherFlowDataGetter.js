@@ -365,23 +365,26 @@ class weatherFlowDataGetter extends EventEmitter {
 
                         logit('getMetaData follows:');
                         console.dir(jsonData, { depth: null });
-
-                        try {
-                            this.station.publicName = jsonData.stations[0].public_name;
-                            this.station.latitude = jsonData.stations[0].latitude;
-                            this.station.longitude = jsonData.stations[0].longitude;
-                            this.station.stationID = jsonData.stations[0].station_id;
-                            let devices = jsonData.stations[0].devices;
-                            if (Array.isArray(devices)) {
-                                devices.forEach((device) => {
-                                    if (device.device_type == 'ST' || device.device_type == 'SK') {
-                                        this.station.deviceID = device.device_id;
-                                    };
-                                });;
-                            }
-                            resolve(this.station);
-                        } catch (err) {
-                            reject(err);
+                        if (jsonData.status.status_code == 0) {
+                            try {
+                                this.station.publicName = jsonData.stations[0].public_name;
+                                this.station.latitude = jsonData.stations[0].latitude;
+                                this.station.longitude = jsonData.stations[0].longitude;
+                                this.station.stationID = jsonData.stations[0].station_id;
+                                let devices = jsonData.stations[0].devices;
+                                if (Array.isArray(devices)) {
+                                    devices.forEach((device) => {
+                                        if (device.device_type == 'ST' || device.device_type == 'SK') {
+                                            this.station.deviceID = device.device_id;
+                                        };
+                                    });;
+                                }
+                                resolve(this.station);
+                            } catch (err) {
+                                reject(err);
+                            };
+                        } else {
+                            reject(jsonData.status);
                         };
                     })
                     .catch(err => {

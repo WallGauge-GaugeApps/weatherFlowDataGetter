@@ -32,6 +32,9 @@ wApi.on('errorStationMetaData', (err) => {
 });
 
 function getAllWxData() {
+    
+
+    
     console.log('Getting current conditons for ' + wApi.station.publicName)
     wApi.getCurrent()
         .then((rslt) => {
@@ -46,9 +49,10 @@ function getAllWxData() {
             console.log("Get forecast complete:");
             console.dir(wApi.data.forecast, { depth: null });
             console.log('Getting all rain history....');
-            return wApi.updateAllHistoryValues()
+            // return wApi.updateAllHistoryValues()
+            return wApi.updateMonthHistoryValues()
         })
-        .then((rslt) => {
+        .then((rslt)=>{
             console.log('Get rain history complete:');
             console.dir(wApi.data.history, { depth: null })
         })

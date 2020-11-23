@@ -28,7 +28,8 @@ const weatherDataObj = {
         precipLast14Days: undefined,
         precipLast28Days: undefined,
         precipMonth: undefined,
-        precipYear: undefined
+        precipYear: undefined,
+        precipEvent: undefined
     },
     lightning: {
         lastStikeDate: undefined,
@@ -362,9 +363,6 @@ class weatherFlowDataGetter extends EventEmitter {
                             logit('getMetaData follows:');
                             console.dir(jsonData, { depth: null });
                         };
-
-                        logit('getMetaData follows:');
-                        console.dir(jsonData, { depth: null });
                         if (jsonData.status.status_code == 0) {
                             try {
                                 this.station.publicName = jsonData.stations[0].public_name;
@@ -437,13 +435,51 @@ class weatherFlowDataGetter extends EventEmitter {
     };
 
     /**
+     * Updates history values in this.data.history object by calling:
+     * getAccumulatedPrecipHistory(7), getAccumulatedPrecipHistory(14), getAccumulatedPrecipHistory(28), and getMonthPrecipHistory().
+     * Call this method once a day to keep history up to date.
+     * @returns {Promise} Resolved promise argument will be this.data.history 
+     */
+    updateMonthHistoryValues() {
+        return new Promise((resolve, reject) => {
+            this.getAccumulatedPrecipHistory(7)
+                .then((rslt) => {
+                    if (this.verbose) logit('Setting 7 Day precip ' + rslt);
+                    this.data.history.precipLast7Days = rslt;
+                    return this.getAccumulatedPrecipHistory(14)
+                })
+                .then((rslt) => {
+                    if (this.verbose) logit('Setting 14 Day precip ' + rslt);
+                    this.data.history.precipLast14Days = rslt;
+                    return this.getAccumulatedPrecipHistory(28)
+                })
+                .then((rslt) => {
+                    if (this.verbose) logit('Setting 28 Day precip ' + rslt);
+                    this.data.history.precipLast28Days = rslt;
+                    return this.getMonthPrecipHistory()
+                })
+                .then((rslt) => {
+                    if (this.verbose) logit('Setting monthly precip ' + rslt);
+                    this.data.history.precipMonth = rslt;
+                    return this.getPrecipEvent();
+                })
+                .then(()=>{
+                    resolve(this.data.history);
+                })
+                .catch((err) => {
+                    logit('Error getting History information');
+                    reject(err);
+                });
+        });
+    };
+
+    /**
      * Calls getHistory repeatedly for the value passed in daysBack parameter to calculate the accumulated precipitation.
      * @param {number} daysBack Days in history to go back and fetch accumulated precipitation.
      * @returns {Promise} Resolved promise argument will be accumulated precipitation (in inches) for daysBack from today, as a number.
      */
     getAccumulatedPrecipHistory(daysBack = 7) {
         return new Promise((resolve, reject) => {
-            let dayOfMonth = (new Date()).getDate();
             let promisesArray = []
             for (let index = 1; index <= daysBack; index++) {
                 let dateCode = new Date((new Date()).setDate((new Date()).getDate() - index));
@@ -454,12 +490,16 @@ class weatherFlowDataGetter extends EventEmitter {
                     let totalPrecip = 0;
                     values.forEach((val) => {
                         if ('lclDayRainAccumFinal' in val || 'lclDayRainAccum' in val) {
+                            let thisDaysAmount = 0;
                             if (this.verbose) console.log('The rain amount for ' + (new Date(val.epoch)).toDateString() + ', lclDayRainAccumFinal = ' + convertMillimeterToInch(val.lclDayRainAccumFinal) + ', lclDayRainAccum = ' + convertMillimeterToInch(val.lclDayRainAccum));
                             if (val.lclDayRainAccumFinal == null || val.lclDayRainAccumFinal == undefined) {
-                                totalPrecip = totalPrecip + val.lclDayRainAccum;
+                                // totalPrecip = totalPrecip + val.lclDayRainAccum;
+                                thisDaysAmount = val.lclDayRainAccum;
                             } else {
-                                totalPrecip = totalPrecip + val.lclDayRainAccumFinal;
+                                // totalPrecip = totalPrecip + val.lclDayRainAccumFinal;
+                                thisDaysAmount = val.lclDayRainAccumFinal
                             };
+                            totalPrecip = totalPrecip + thisDaysAmount;
                         };
                     });
                     totalPrecip = convertMillimeterToInch(totalPrecip);
@@ -471,6 +511,63 @@ class weatherFlowDataGetter extends EventEmitter {
                 })
         })
     };
+
+    /**
+     * Returns accumulated precipitation for consecutive days in history.  daysBack = the number of days to go back in time. Sets this.data.history.precipEvent.
+     * precipEvent does not include today's rain total.  
+     * 
+     * @param {number} daysBack Days in history to go back and to find consecutive days of rain
+     * @returns {Promise} Resolved promise argument will be accumulated precipitation PrecipEvent (in inches) for daysBack from today, as a number
+     */
+
+    getPrecipEvent(daysBack = 7) {
+        return new Promise((resolve, reject) => {
+            let pEventAmount = 0;
+            let pEventOver = false
+            let promisesArray = []
+            for (let index = 1; index <= daysBack; index++) {
+                let dateCode = new Date((new Date()).setDate((new Date()).getDate() - index));
+                promisesArray.push(this.getHistory(dateCode))
+            }
+            Promise.all(promisesArray)
+                .then((values) => {
+                    let totalPrecip = 0;
+                    values.forEach((val) => {
+                        if ('lclDayRainAccumFinal' in val || 'lclDayRainAccum' in val) {
+                            let thisDaysAmount = 0
+                            if (this.verbose) console.log('The rain amount for ' + (new Date(val.epoch)).toDateString() + ', lclDayRainAccumFinal = ' + convertMillimeterToInch(val.lclDayRainAccumFinal) + ', lclDayRainAccum = ' + convertMillimeterToInch(val.lclDayRainAccum));
+                            
+                            if (val.lclDayRainAccumFinal == null || val.lclDayRainAccumFinal == undefined) {
+                                // totalPrecip = totalPrecip + val.lclDayRainAccum;
+                                thisDaysAmount = val.lclDayRainAccum;
+                            } else {
+                                // totalPrecip = totalPrecip + val.lclDayRainAccumFinal;
+                                thisDaysAmount = val.lclDayRainAccumFinal
+                            };
+
+                            if (pEventOver == false) {
+                                if (thisDaysAmount == 0) {
+                                    pEventOver = true;
+                                } else {
+                                    pEventAmount = pEventAmount + thisDaysAmount;
+                                };
+                            };
+
+                            // console.log('The rain amount for ' + (new Date(val.epoch)).toDateString() + ', lclDayRainAccumFinal = ' + convertMillimeterToInch(val.lclDayRainAccumFinal) + ', lclDayRainAccum = ' + convertMillimeterToInch(val.lclDayRainAccum) + ', pEventAmount = ' + convertMillimeterToInch(pEventAmount));
+
+                        };
+                    });
+                    pEventAmount = convertMillimeterToInch(pEventAmount);
+                    this.data.history.precipEvent = pEventAmount;
+                    resolve(pEventAmount);
+                })
+                .catch((err) => {
+                    logit('Error with getPrecipEvent');
+                    reject(err);
+                })
+        })
+
+    }
 
     /**
      * Calls this.getHistory repeatedly for every day of the current month up to today to calculate the accumlated precipitation for this month.

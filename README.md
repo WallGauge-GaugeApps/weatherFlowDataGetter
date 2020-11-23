@@ -57,7 +57,8 @@ This class pulls weather information from the [WeatherFlow Smart Weather API](ht
     precipLast14Days: 0.52,         // Total accumulated precipitation for the last 14 days in inches.
     precipLast28Days: 2.55,         // Total accumulated precipitation for the last 28 days in inches.
     precipMonth: 0,                 // Total accumulated precipitation for the current month.
-    precipYear: 6.99                // Total accumulated precipitation for the current year.
+    precipYear: 6.99,               // Total accumulated precipitation for the current year.
+    precipEvent: 0.25               // Total accumulated precipitation for consecutive days or precip.
   },
     lightning: {
     lastStikeDate: '9/12/2020, 12:28:39 AM',    // Time and Date of last lightning strike.

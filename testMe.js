@@ -32,31 +32,39 @@ wApi.on('errorStationMetaData', (err) => {
 });
 
 function getAllWxData() {
-    
 
-    
+
+
     console.log('Getting current conditons for ' + wApi.station.publicName)
-    wApi.getCurrent()
-        .then((rslt) => {
-            console.log('Get current complete. Observation Date = ' + wApi.data.obsDate);
-            console.dir(wApi.data.current, { depth: null });
-            console.log('Here is the lightning information:')
-            console.dir(wApi.data.lightning, { depth: null });
-            console.log('Getting Forecast...')
-            return wApi.getForecast()
-        })
-        .then((rslt) => {
-            console.log("Get forecast complete:");
-            console.dir(wApi.data.forecast, { depth: null });
-            console.log('Getting all rain history....');
-            // return wApi.updateAllHistoryValues()
-            return wApi.updateMonthHistoryValues()
-        })
-        .then((rslt)=>{
-            console.log('Get rain history complete:');
-            console.dir(wApi.data.history, { depth: null })
-        })
-        .catch((err) => {
-            console.error('Error calling wApi:', err);
-        })
+   
+
+    wApi.getPrecipEvent()
+    .then((rslt) => {
+        console.log('rslt = ' + rslt);
+        console.dir(wApi.data, {depth:null});
+    })
+
+    // wApi.getCurrent()
+    // .then((rslt) => {
+    //     console.log('Get current complete. Observation Date = ' + wApi.data.obsDate);
+    //     console.dir(wApi.data.current, { depth: null });
+    //     console.log('Here is the lightning information:')
+    //     console.dir(wApi.data.lightning, { depth: null });
+    //     console.log('Getting Forecast...')
+    //     return wApi.getForecast()
+    // })
+    // .then((rslt) => {
+    //     console.log("Get forecast complete:");
+    //     console.dir(wApi.data.forecast, { depth: null });
+    //     console.log('Getting all rain history....');
+    //     // return wApi.updateAllHistoryValues()
+    //     return wApi.updateMonthHistoryValues()
+    // })
+    // .then((rslt)=>{
+    //     console.log('Get rain history complete:');
+    //     console.dir(wApi.data.history, { depth: null })
+    // })
+    // .catch((err) => {
+    //     console.error('Error calling wApi:', err);
+    // })
 }

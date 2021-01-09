@@ -164,8 +164,8 @@ class weatherFlowDataGetter extends EventEmitter {
                         "Content-Type": "application/x-www-form-urlencoded"
                     }
                 };
-                let uri = baseApiURL + '/better_forecast?api_key=' + this.apiKey + '&lat=' + this.station.latitude + '&lon=' + this.station.longitude;
-
+                // let uri = baseApiURL + '/better_forecast?api_key=' + this.apiKey + '&lat=' + this.station.latitude + '&lon=' + this.station.longitude;
+                let uri = baseApiURL + '/better_forecast?station_id='+ this.station.stationID +'&api_key=' + this.apiKey;
                 fetch(uri, callObj)
                     .then(res => res.json())
                     .then(jsonData => {

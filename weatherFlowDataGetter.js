@@ -165,7 +165,7 @@ class weatherFlowDataGetter extends EventEmitter {
                     }
                 };
                 // let uri = baseApiURL + '/better_forecast?api_key=' + this.apiKey + '&lat=' + this.station.latitude + '&lon=' + this.station.longitude;
-                let uri = baseApiURL + '/better_forecast?station_id='+ this.station.stationID +'&api_key=' + this.apiKey;
+                let uri = baseApiURL + '/better_forecast?station_id=' + this.station.stationID + '&api_key=' + this.apiKey;
                 fetch(uri, callObj)
                     .then(res => res.json())
                     .then(jsonData => {
@@ -463,7 +463,7 @@ class weatherFlowDataGetter extends EventEmitter {
                     this.data.history.precipMonth = rslt;
                     return this.getPrecipEvent();
                 })
-                .then(()=>{
+                .then(() => {
                     resolve(this.data.history);
                 })
                 .catch((err) => {
@@ -536,7 +536,7 @@ class weatherFlowDataGetter extends EventEmitter {
                         if ('lclDayRainAccumFinal' in val || 'lclDayRainAccum' in val) {
                             let thisDaysAmount = 0
                             if (this.verbose) console.log('The rain amount for ' + (new Date(val.epoch)).toDateString() + ', lclDayRainAccumFinal = ' + convertMillimeterToInch(val.lclDayRainAccumFinal) + ', lclDayRainAccum = ' + convertMillimeterToInch(val.lclDayRainAccum));
-                            
+
                             if (val.lclDayRainAccumFinal == null || val.lclDayRainAccumFinal == undefined) {
                                 // totalPrecip = totalPrecip + val.lclDayRainAccum;
                                 thisDaysAmount = val.lclDayRainAccum;
